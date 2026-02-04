@@ -1,0 +1,298 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================
+// 客戶管理
+// =====================
+model Customer {
+  id            Int       @id @default(autoincrement())
+  name          String // 客戶名稱（如：東海大學）
+  contactPerson String? // 主要聯絡人
+  contactEmail  String?
+  contactPhone  String?
+  notes         String?
+  sentiment     Sentiment @default(NEUTRAL) // AI 分析的整體情緒
+  lastContactAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  groups LineGroup[]
+  issues Issue[]
+
+  @@map("customers")
+}
+
+enum Sentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+  AT_RISK
+}
+
+// =====================
+// LINE 群聊管理
+// =====================
+model LineGroup {
+  id          Int         @id @default(autoincrement())
+  lineGroupId String      @unique // LINE 的 groupId
+  displayName String? // 自訂顯示名稱
+  status      GroupStatus @default(ACTIVE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  customerId Int?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  members  GroupMember[]
+  messages Message[]
+  issues   Issue[]
+
+  @@map("line_groups")
+}
+
+enum GroupStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+// =====================
+// LINE 群組成員
+// =====================
+model Member {
+  id          Int        @id @default(autoincrement())
+  lineUserId  String     @unique // LINE 的 userId
+  displayName String?
+  pictureUrl  String?
+  role        MemberRole @default(EXTERNAL)
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  groups        GroupMember[]
+  messages      Message[]
+  repliedIssues Issue[]       @relation("RepliedBy")
+
+  @@map("members")
+}
+
+enum MemberRole {
+  STAFF // 員工（我方）
+  EXTERNAL_ADMIN // 外部管理者
+  EXTERNAL // 外部人員
+}
+
+// 群組-成員 多對多關聯
+model GroupMember {
+  groupId  Int
+  memberId Int
+  joinedAt DateTime @default(now())
+
+  group  LineGroup @relation(fields: [groupId], references: [id])
+  member Member    @relation(fields: [memberId], references: [id])
+
+  @@id([groupId, memberId])
+  @@map("group_members")
+}
+
+// =====================
+// 訊息記錄
+// =====================
+model Message {
+  id            Int         @id @default(autoincrement())
+  lineMessageId String?     @unique // LINE messageId
+  messageType   MessageType @default(TEXT)
+  content       String? // 文字內容
+  mediaUrl      String? // 圖片/檔案 URL
+  rawPayload    Json? // 原始 webhook payload
+  createdAt     DateTime // LINE 訊息時間戳
+  receivedAt    DateTime    @default(now())
+
+  groupId Int
+  group   LineGroup @relation(fields: [groupId], references: [id])
+
+  memberId Int
+  member   Member @relation(fields: [memberId], references: [id])
+
+  // 關聯的問題（若此訊息觸發了問題）
+  triggeredIssue Issue? @relation("TriggerMessage")
+  // 作為回覆的問題
+  replyToIssue   Issue? @relation("ReplyMessage")
+
+  @@index([groupId, createdAt(sort: Desc)])
+  @@map("messages")
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+  STICKER
+  LOCATION
+  OTHER
+}
+
+// =====================
+// 問題/工單追蹤
+// =====================
+model Issue {
+  id Int @id @default(autoincrement())
+
+  // 問題來源
+  questionSummary String? // AI 生成的問題摘要
+
+  // 狀態
+  status IssueStatus @default(PENDING)
+
+  // AI 分析結果
+  isQuestion          Boolean    @default(true)
+  replyRelevanceScore Int? // 回覆相關性評估值 (0-100)
+  sentiment           Sentiment? // 此問題的情緒
+  suggestedReply      String? // AI 建議回覆
+
+  // 時間追蹤
+  createdAt  DateTime  @default(now())
+  timeoutAt  DateTime? // 預計超時時間
+  repliedAt  DateTime?
+  resolvedAt DateTime?
+
+  // 關聯
+  groupId Int
+  group   LineGroup @relation(fields: [groupId], references: [id])
+
+  customerId Int?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  triggerMessageId Int?     @unique
+  triggerMessage   Message? @relation("TriggerMessage", fields: [triggerMessageId], references: [id])
+
+  replyMessageId Int?     @unique
+  replyMessage   Message? @relation("ReplyMessage", fields: [replyMessageId], references: [id])
+
+  repliedById Int?
+  repliedBy   Member? @relation("RepliedBy", fields: [repliedById], references: [id])
+
+  // 標籤（多對多）
+  tags IssueTagRelation[]
+
+  @@index([status, createdAt])
+  @@index([customerId, status])
+  @@map("issues")
+}
+
+enum IssueStatus {
+  PENDING // 待回覆
+  REPLIED // 已回覆（評估值 >= 60）
+  WAITING_CUSTOMER // 等待對方回覆（我方反問）
+  TIMEOUT // 超時
+  RESOLVED // 已解決
+  IGNORED // 忽略（非問題）
+}
+
+// =====================
+// 問題標籤（AI 自動生成）
+// =====================
+model IssueTag {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  usageCount  Int      @default(0) // 使用次數，用於合併判斷
+  createdAt   DateTime @default(now())
+
+  issues IssueTagRelation[]
+
+  @@map("issue_tags")
+}
+
+model IssueTagRelation {
+  issueId Int
+  tagId   Int
+
+  issue Issue    @relation(fields: [issueId], references: [id])
+  tag   IssueTag @relation(fields: [tagId], references: [id])
+
+  @@id([issueId, tagId])
+  @@map("issue_tag_relations")
+}
+
+// =====================
+// 後台用戶管理
+// =====================
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  email        String    @unique
+  passwordHash String
+  displayName  String?
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  roleId Int
+  role   Role @relation(fields: [roleId], references: [id])
+
+  activityLogs ActivityLog[]
+
+  @@map("users")
+}
+
+// =====================
+// 角色權限
+// =====================
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  permissions String[] // 權限代碼列表
+  isSystem    Boolean  @default(false) // 系統內建角色不可刪除
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+
+  @@map("roles")
+}
+
+// =====================
+// 系統設定
+// =====================
+model Setting {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("settings")
+}
+
+// =====================
+// 操作日誌
+// =====================
+model ActivityLog {
+  id         Int      @id @default(autoincrement())
+  entityType String // customer / group / member / issue / user / role / setting
+  entityId   Int?
+  action     String // create / update / delete / login / logout / analyze
+  details    Json? // 變更詳情
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  userId Int?
+  user   User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("activity_logs")
+}
