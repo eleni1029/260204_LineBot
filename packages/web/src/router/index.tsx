@@ -16,6 +16,7 @@ import { UserList } from '@/pages/Users/List'
 import { RoleList } from '@/pages/Roles/List'
 import { Settings } from '@/pages/Settings'
 import { LogList } from '@/pages/Logs/List'
+import { KnowledgeList } from '@/pages/Knowledge/List'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -63,6 +64,7 @@ export function AppRouter() {
         <Route path="roles" element={<RoleList />} />
         <Route path="settings" element={<Settings />} />
         <Route path="logs" element={<LogList />} />
+        <Route path="knowledge" element={<KnowledgeList />} />
       </Route>
     </Routes>
   )

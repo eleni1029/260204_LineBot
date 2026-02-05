@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Table, Tag, Select, Space } from 'antd'
+import { Table, Tag, Select, Space, Button, Popconfirm, message, Dropdown } from 'antd'
+import { DeleteOutlined, DownOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { issuesApi } from '@/services/api'
+import type { MenuProps } from 'antd'
+import { issuesApi, type Channel } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
+import { ChannelTag } from '@/components/ChannelTag'
 
 interface Issue {
   id: number
@@ -10,7 +14,7 @@ interface Issue {
   status: string
   sentiment: string | null
   replyRelevanceScore: number | null
-  group: { id: number; displayName: string; customer: { name: string } | null }
+  group: { id: number; displayName: string; channel: Channel; customer: { name: string } | null }
   triggerMessage: { member: { displayName: string } } | null
   repliedBy: { displayName: string } | null
   createdAt: string
@@ -22,7 +26,9 @@ export function IssueList() {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<string | undefined>()
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 })
+  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const navigate = useNavigate()
+  const hasPermission = useAuthStore((state) => state.hasPermission)
 
   const fetchData = async (page = 1) => {
     setLoading(true)
@@ -49,6 +55,54 @@ export function IssueList() {
     fetchData()
   }, [status])
 
+  const handleDelete = async (id: number) => {
+    try {
+      const res = await issuesApi.delete(id)
+      if (res.success) {
+        message.success('刪除成功')
+        fetchData(pagination.current)
+      } else {
+        message.error(res.error?.message || '刪除失敗')
+      }
+    } catch {
+      message.error('刪除失敗')
+    }
+  }
+
+  const handleBatchDelete = async () => {
+    if (selectedRowKeys.length === 0) return
+
+    try {
+      const res = await issuesApi.batchDelete(selectedRowKeys)
+      if (res.success) {
+        message.success(`成功刪除 ${res.data?.deleted || selectedRowKeys.length} 個問題`)
+        setSelectedRowKeys([])
+        fetchData(1)
+      } else {
+        message.error(res.error?.message || '刪除失敗')
+      }
+    } catch {
+      message.error('刪除失敗')
+    }
+  }
+
+  const handleBatchUpdateStatus = async (newStatus: string) => {
+    if (selectedRowKeys.length === 0) return
+
+    try {
+      const res = await issuesApi.batchUpdateStatus(selectedRowKeys, newStatus)
+      if (res.success) {
+        message.success(`成功更新 ${res.data?.updated || selectedRowKeys.length} 個問題狀態`)
+        setSelectedRowKeys([])
+        fetchData(pagination.current)
+      } else {
+        message.error(res.error?.message || '更新失敗')
+      }
+    } catch {
+      message.error('更新失敗')
+    }
+  }
+
   const statusColors: Record<string, string> = {
     PENDING: 'gold',
     REPLIED: 'green',
@@ -67,7 +121,22 @@ export function IssueList() {
     IGNORED: '已忽略',
   }
 
+  const batchStatusMenuItems: MenuProps['items'] = [
+    { key: 'PENDING', label: '設為待回覆' },
+    { key: 'REPLIED', label: '設為已回覆' },
+    { key: 'WAITING_CUSTOMER', label: '設為等待客戶' },
+    { key: 'RESOLVED', label: '設為已解決' },
+    { key: 'IGNORED', label: '設為已忽略' },
+  ]
+
   const columns: ColumnsType<Issue> = [
+    {
+      title: '渠道',
+      dataIndex: ['group', 'channel'],
+      key: 'channel',
+      width: 80,
+      render: (channel) => <ChannelTag channel={channel || 'LINE'} />,
+    },
     {
       title: '問題摘要',
       dataIndex: 'questionSummary',
@@ -118,9 +187,38 @@ export function IssueList() {
     },
   ]
 
+  // 添加操作列（如果有權限）
+  if (hasPermission('issue.edit')) {
+    columns.push({
+      title: '操作',
+      key: 'action',
+      width: 80,
+      render: (_, record) => (
+        <Popconfirm
+          title="確定要刪除此問題嗎？"
+          onConfirm={() => handleDelete(record.id)}
+          okText="確定"
+          cancelText="取消"
+          okButtonProps={{ danger: true }}
+        >
+          <Button type="link" danger size="small" icon={<DeleteOutlined />}>
+            刪除
+          </Button>
+        </Popconfirm>
+      ),
+    })
+  }
+
+  const rowSelection = hasPermission('issue.edit')
+    ? {
+        selectedRowKeys,
+        onChange: (keys: React.Key[]) => setSelectedRowKeys(keys as number[]),
+      }
+    : undefined
+
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
         <Space>
           <span>狀態：</span>
           <Select
@@ -139,6 +237,33 @@ export function IssueList() {
             ]}
           />
         </Space>
+
+        {hasPermission('issue.edit') && selectedRowKeys.length > 0 && (
+          <Space>
+            <Dropdown
+              menu={{
+                items: batchStatusMenuItems,
+                onClick: ({ key }) => handleBatchUpdateStatus(key),
+              }}
+            >
+              <Button>
+                批量更新狀態 ({selectedRowKeys.length}) <DownOutlined />
+              </Button>
+            </Dropdown>
+
+            <Popconfirm
+              title={`確定要刪除選中的 ${selectedRowKeys.length} 個問題嗎？`}
+              onConfirm={handleBatchDelete}
+              okText="確定刪除"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+            >
+              <Button danger icon={<DeleteOutlined />}>
+                批量刪除
+              </Button>
+            </Popconfirm>
+          </Space>
+        )}
       </div>
 
       <Table
@@ -146,6 +271,7 @@ export function IssueList() {
         dataSource={issues}
         rowKey="id"
         loading={loading}
+        rowSelection={rowSelection}
         pagination={{
           ...pagination,
           onChange: (page) => fetchData(page),

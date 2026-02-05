@@ -1,27 +1,88 @@
+# ============================================
 # Dependencies
+# ============================================
 node_modules/
 
-# Environment
+# ============================================
+# Environment & Secrets (敏感檔案)
+# ============================================
 .env
+.env.local
+.env.*.local
 *.local
 
+# GCP Service Account (敏感)
+gcp-service-account.json
+*-service-account.json
+gcp-*.json
+!gcp-service-account.json.example
+
+# ============================================
+# Database (本地開發資料庫)
+# ============================================
+*.db
+*.db-journal
+prisma/dev.db
+prisma/dev.db-journal
+
+# ============================================
 # Build outputs
+# ============================================
 dist/
 build/
+*.tsbuildinfo
 
-# IDE
+# ============================================
+# IDE & Editor
+# ============================================
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 
-# OS
+# ============================================
+# OS Generated Files
+# ============================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
+# ============================================
 # Logs
+# ============================================
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Test coverage
+# ============================================
+# Test & Coverage
+# ============================================
 coverage/
+.nyc_output/
+
+# ============================================
+# Misc
+# ============================================
+*.tmp
+*.temp
+.cache/
+
+# ============================================
+# Knowledge Files (用戶上傳)
+# ============================================
+packages/server/knowledge-files/
+!packages/server/knowledge-files/.gitkeep
+
+# ============================================
+# Package Lock (使用 npm)
+# ============================================
+# 如果專案使用 yarn，取消註解下行
+# package-lock.json

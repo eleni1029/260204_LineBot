@@ -16,7 +16,7 @@ export async function createLog(params: LogParams) {
       entityType: params.entityType,
       entityId: params.entityId,
       action: params.action,
-      details: params.details,
+      details: params.details ? JSON.parse(JSON.stringify(params.details)) : undefined,
       userId: params.userId,
       ipAddress: params.ipAddress,
       userAgent: params.userAgent,

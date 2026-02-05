@@ -2,12 +2,21 @@ import { z } from 'zod'
 import { config as dotenvConfig } from 'dotenv'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { existsSync } from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 // Load .env file from packages/server directory
 dotenvConfig({ path: resolve(__dirname, '../../.env') })
+
+// Convert relative GOOGLE_APPLICATION_CREDENTIALS path to absolute
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS?.startsWith('.')) {
+  const absolutePath = resolve(__dirname, '../../', process.env.GOOGLE_APPLICATION_CREDENTIALS)
+  if (existsSync(absolutePath)) {
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = absolutePath
+  }
+}
 
 const envSchema = z.object({
   DATABASE_URL: z.string(),
@@ -17,9 +26,11 @@ const envSchema = z.object({
   HOST: z.string().default('0.0.0.0'),
   LINE_CHANNEL_SECRET: z.string().optional(),
   LINE_CHANNEL_ACCESS_TOKEN: z.string().optional(),
-  AI_PROVIDER: z.enum(['claude', 'gemini', 'ollama']).default('gemini'),
+  AI_PROVIDER: z.enum(['gemini-oauth', 'claude-code-oauth', 'claude', 'gemini', 'ollama']).default('gemini-oauth'),
   CLAUDE_API_KEY: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
+  GCP_PROJECT_ID: z.string().optional(),
+  GCP_LOCATION: z.string().default('us-central1'),
   OLLAMA_BASE_URL: z.string().default('http://localhost:11434'),
 })
 

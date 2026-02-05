@@ -28,10 +28,9 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
     '/',
     { preHandler: [authenticate, requirePermission('user.view')] },
     async (request) => {
-      const { page = 1, pageSize = 20 } = request.query as {
-        page?: number
-        pageSize?: number
-      }
+      const query = request.query as { page?: string; pageSize?: string }
+      const page = parseInt(query.page || '1', 10)
+      const pageSize = parseInt(query.pageSize || '20', 10)
 
       const [users, total] = await Promise.all([
         prisma.user.findMany({

@@ -3,7 +3,8 @@ import { Table, Input, DatePicker, Space, Button, Tag } from 'antd'
 import { SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
-import { messagesApi } from '@/services/api'
+import { messagesApi, type Channel } from '@/services/api'
+import { ChannelTag } from '@/components/ChannelTag'
 
 const { RangePicker } = DatePicker
 
@@ -11,8 +12,8 @@ interface Message {
   id: number
   content: string | null
   messageType: string
-  group: { id: number; displayName: string; customer: { name: string } | null }
-  member: { id: number; displayName: string }
+  group: { id: number; displayName: string; channel: Channel; customer: { name: string } | null }
+  member: { id: number; displayName: string; channel: Channel }
   createdAt: string
 }
 
@@ -69,6 +70,13 @@ export function MessageList() {
   }
 
   const columns: ColumnsType<Message> = [
+    {
+      title: '渠道',
+      dataIndex: ['group', 'channel'],
+      key: 'channel',
+      width: 80,
+      render: (channel) => <ChannelTag channel={channel || 'LINE'} />,
+    },
     {
       title: '內容',
       dataIndex: 'content',

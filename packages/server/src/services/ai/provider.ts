@@ -1,5 +1,6 @@
 export interface QuestionAnalysis {
   isQuestion: boolean
+  confidence: number  // 0-100，判斷是否為問題的信心度
   summary: string
   sentiment: 'positive' | 'neutral' | 'negative'
   suggestedTags: string[]
@@ -22,7 +23,64 @@ export interface CustomerSentimentAnalysis {
   reason: string
 }
 
+export interface KnowledgeEntry {
+  id: number
+  question: string
+  answer: string
+  category?: string | null
+  keywords?: string[]
+}
+
+export interface RAGSearchResult {
+  matchedEntries: Array<{
+    entry: KnowledgeEntry
+    relevanceScore: number  // 0-100 語義相關度
+  }>
+  canAnswer: boolean        // 是否能回答這個問題
+  confidence: number        // 整體信心度 0-100
+}
+
+export interface RAGAnswerResult {
+  answer: string            // 生成的回答
+  confidence: number        // 回答信心度 0-100
+  sources: number[]         // 使用的知識條目 ID
+}
+
+/**
+ * AI 生成回答的結果
+ */
+export interface GenerateAnswerResult {
+  answer: string            // 生成的回答
+  confidence: number        // 回答信心度 0-100
+  sources: number[]         // 使用的知識條目 ID
+  canAnswer: boolean        // 是否能基於知識庫回答
+}
+
 export interface AIProvider {
+  /**
+   * 通用文字生成（用於自定義 prompt）
+   */
+  generate(prompt: string): Promise<string>
+
+  /**
+   * RAG 語義搜尋 - 找出與查詢語義相關的知識條目
+   */
+  ragSearch(query: string, entries: KnowledgeEntry[]): Promise<RAGSearchResult>
+
+  /**
+   * RAG 生成回答 - 根據知識庫內容生成回答
+   */
+  ragAnswer(query: string, relevantEntries: KnowledgeEntry[]): Promise<RAGAnswerResult>
+
+  /**
+   * 基於知識庫生成回答（核心方法）
+   * - 分析用戶問題
+   * - 判斷知識庫中是否有相關資訊
+   * - 如果有，生成基於知識庫的回答
+   * - 如果沒有，返回 canAnswer: false
+   */
+  generateAnswer(query: string, knowledgeEntries: KnowledgeEntry[]): Promise<GenerateAnswerResult>
+
   /**
    * 分析訊息是否為提問
    */

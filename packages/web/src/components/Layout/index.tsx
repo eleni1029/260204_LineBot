@@ -16,6 +16,7 @@ import {
   LogoutOutlined,
   CommentOutlined,
   UsergroupAddOutlined,
+  BookOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/auth'
 import { authApi } from '@/services/api'
@@ -36,7 +37,7 @@ const menuItems: MenuProps['items'] = [
   {
     key: '/groups',
     icon: <CommentOutlined />,
-    label: '群聊管理',
+    label: '對話管理',
   },
   {
     key: '/members',
@@ -52,6 +53,11 @@ const menuItems: MenuProps['items'] = [
     key: '/issues',
     icon: <QuestionCircleOutlined />,
     label: '問題追蹤',
+  },
+  {
+    key: '/knowledge',
+    icon: <BookOutlined />,
+    label: '知識庫',
   },
   {
     type: 'divider',

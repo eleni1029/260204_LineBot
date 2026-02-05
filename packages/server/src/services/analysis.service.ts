@@ -91,7 +91,8 @@ export async function runAnalysis(params: AnalysisParams) {
 
     results.issuesCreated++
 
-    // 處理標籤
+    // 處理標籤（追蹤已添加的標籤避免重複）
+    const addedTagIds = new Set<number>()
     for (const tagName of analysis.suggestedTags) {
       const similarity = await ai.findSimilarTag(tagName, tagNames)
 
@@ -108,7 +109,8 @@ export async function runAnalysis(params: AnalysisParams) {
       }
 
       const tag = await prisma.issueTag.findUnique({ where: { name: tagToUse } })
-      if (tag) {
+      if (tag && !addedTagIds.has(tag.id)) {
+        addedTagIds.add(tag.id)
         await prisma.issueTagRelation.create({
           data: { issueId: issue.id, tagId: tag.id },
         })

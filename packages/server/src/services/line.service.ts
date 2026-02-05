@@ -38,3 +38,49 @@ export async function validateSignature(body: string, signature: string): Promis
 export function resetClient() {
   clientInstance = null
 }
+
+/**
+ * 回覆訊息
+ */
+export async function replyMessage(replyToken: string, text: string) {
+  const client = await getLineClient()
+  return client.replyMessage({
+    replyToken,
+    messages: [{ type: 'text', text }],
+  })
+}
+
+/**
+ * 主動推送訊息
+ */
+export async function pushMessage(to: string, text: string) {
+  const client = await getLineClient()
+  return client.pushMessage({
+    to,
+    messages: [{ type: 'text', text }],
+  })
+}
+
+/**
+ * 取得群組摘要（包含名稱）
+ */
+export async function getGroupSummary(groupId: string) {
+  const client = await getLineClient()
+  try {
+    return await client.getGroupSummary(groupId)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 取得用戶個人資料
+ */
+export async function getUserProfile(userId: string) {
+  const client = await getLineClient()
+  try {
+    return await client.getProfile(userId)
+  } catch {
+    return null
+  }
+}

@@ -9,32 +9,26 @@ export const logsRoutes: FastifyPluginAsync = async (app) => {
     '/',
     { preHandler: [authenticate, requirePermission('log.view')] },
     async (request) => {
-      const {
-        page = 1,
-        pageSize = 50,
-        entityType,
-        action,
-        userId,
-        startDate,
-        endDate,
-      } = request.query as {
-        page?: number
-        pageSize?: number
+      const query = request.query as {
+        page?: string
+        pageSize?: string
         entityType?: string
         action?: string
-        userId?: number
+        userId?: string
         startDate?: string
         endDate?: string
       }
+      const page = parseInt(query.page || '1', 10)
+      const pageSize = parseInt(query.pageSize || '50', 10)
 
       const where: Record<string, unknown> = {}
-      if (entityType) where.entityType = entityType
-      if (action) where.action = action
-      if (userId) where.userId = userId
-      if (startDate || endDate) {
+      if (query.entityType) where.entityType = query.entityType
+      if (query.action) where.action = query.action
+      if (query.userId) where.userId = parseInt(query.userId, 10)
+      if (query.startDate || query.endDate) {
         where.createdAt = {}
-        if (startDate) (where.createdAt as Record<string, Date>).gte = new Date(startDate)
-        if (endDate) (where.createdAt as Record<string, Date>).lte = new Date(endDate)
+        if (query.startDate) (where.createdAt as Record<string, Date>).gte = new Date(query.startDate)
+        if (query.endDate) (where.createdAt as Record<string, Date>).lte = new Date(query.endDate)
       }
 
       const [logs, total] = await Promise.all([

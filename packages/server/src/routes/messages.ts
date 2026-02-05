@@ -9,34 +9,28 @@ export const messagesRoutes: FastifyPluginAsync = async (app) => {
     '/',
     { preHandler: [authenticate, requirePermission('message.view')] },
     async (request) => {
-      const {
-        page = 1,
-        pageSize = 50,
-        groupId,
-        memberId,
-        search,
-        startDate,
-        endDate,
-      } = request.query as {
-        page?: number
-        pageSize?: number
-        groupId?: number
-        memberId?: number
+      const query = request.query as {
+        page?: string
+        pageSize?: string
+        groupId?: string
+        memberId?: string
         search?: string
         startDate?: string
         endDate?: string
       }
+      const page = parseInt(query.page || '1', 10)
+      const pageSize = parseInt(query.pageSize || '50', 10)
 
       const where: Record<string, unknown> = {}
-      if (groupId) where.groupId = groupId
-      if (memberId) where.memberId = memberId
-      if (search) {
-        where.content = { contains: search, mode: 'insensitive' }
+      if (query.groupId) where.groupId = parseInt(query.groupId, 10)
+      if (query.memberId) where.memberId = parseInt(query.memberId, 10)
+      if (query.search) {
+        where.content = { contains: query.search, mode: 'insensitive' }
       }
-      if (startDate || endDate) {
+      if (query.startDate || query.endDate) {
         where.createdAt = {}
-        if (startDate) (where.createdAt as Record<string, Date>).gte = new Date(startDate)
-        if (endDate) (where.createdAt as Record<string, Date>).lte = new Date(endDate)
+        if (query.startDate) (where.createdAt as Record<string, Date>).gte = new Date(query.startDate)
+        if (query.endDate) (where.createdAt as Record<string, Date>).lte = new Date(query.endDate)
       }
 
       const [messages, total] = await Promise.all([

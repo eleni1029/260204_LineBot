@@ -70,6 +70,12 @@ export const PERMISSIONS = {
   // 分析
   'analysis.run': '執行分析',
 
+  // 知識庫
+  'knowledge.view': '查看知識庫',
+  'knowledge.create': '新增知識庫',
+  'knowledge.edit': '編輯知識庫',
+  'knowledge.delete': '刪除知識庫',
+
   // 用戶
   'user.view': '查看用戶',
   'user.create': '新增用戶',

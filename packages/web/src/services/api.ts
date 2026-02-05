@@ -24,8 +24,12 @@ async function request<T>(
   const token = useAuthStore.getState().token
 
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
     ...options.headers,
+  }
+
+  // Only set Content-Type for requests with a body
+  if (options.body) {
+    ;(headers as Record<string, string>)['Content-Type'] = 'application/json'
   }
 
   if (token) {
@@ -52,7 +56,7 @@ export const api = {
   post: <T>(endpoint: string, data?: unknown) =>
     request<T>(endpoint, {
       method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
+      body: JSON.stringify(data ?? {}),
     }),
 
   put: <T>(endpoint: string, data?: unknown) =>
@@ -77,11 +81,20 @@ export const authApi = {
   logout: () => api.post('/auth/logout'),
 }
 
+// Helper to build query string, filtering out undefined/null values
+function buildQuery(params?: Record<string, unknown>): string {
+  if (!params) return ''
+  const filtered = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .reduce((acc, [k, v]) => ({ ...acc, [k]: String(v) }), {} as Record<string, string>)
+  const query = new URLSearchParams(filtered).toString()
+  return query ? `?${query}` : ''
+}
+
 // Customers API
 export const customersApi = {
   list: (params?: { page?: number; pageSize?: number; search?: string }) => {
-    const query = new URLSearchParams(params as Record<string, string>).toString()
-    return api.get<unknown[]>(`/customers${query ? `?${query}` : ''}`)
+    return api.get<unknown[]>(`/customers${buildQuery(params)}`)
   },
   get: (id: number) => api.get<unknown>(`/customers/${id}`),
   create: (data: unknown) => api.post<unknown>('/customers', data),
@@ -91,35 +104,80 @@ export const customersApi = {
     api.put<unknown>(`/customers/${id}/groups`, { groupIds }),
 }
 
+// Channel 類型
+export type Channel = 'LINE' | 'FEISHU'
+
 // Groups API
+export interface Group {
+  id: number
+  lineGroupId: string
+  channel: Channel
+  displayName: string | null
+  status: string
+  knowledgeCategories: string[]
+  autoReplyEnabled: boolean
+  customerId: number | null
+  customer: { id: number; name: string } | null
+  _count: { messages: number; members: number; issues: number }
+  updatedAt: string
+}
+
 export const groupsApi = {
-  list: (params?: { page?: number; pageSize?: number; status?: string; customerId?: number }) => {
-    const query = new URLSearchParams(params as Record<string, string>).toString()
-    return api.get<unknown[]>(`/groups${query ? `?${query}` : ''}`)
+  list: (params?: { page?: number; pageSize?: number; status?: string; customerId?: number; search?: string }) => {
+    return api.get<Group[]>(`/groups${buildQuery(params)}`)
   },
-  get: (id: number) => api.get<unknown>(`/groups/${id}`),
-  update: (id: number, data: unknown) => api.put<unknown>(`/groups/${id}`, data),
+  get: (id: number) => api.get<Group>(`/groups/${id}`),
+  update: (id: number, data: {
+    displayName?: string
+    customerId?: number | null
+    status?: string
+    knowledgeCategories?: string[]
+    autoReplyEnabled?: boolean
+  }) => api.put<Group>(`/groups/${id}`, data),
+  delete: (id: number) => api.delete(`/groups/${id}`),
+  batchDelete: (ids: number[]) => api.post<{ deleted: number }>('/groups/batch-delete', { ids }),
+  fetchName: (id: number) => api.post<Group>(`/groups/${id}/fetch-name`),
+  batchUpdateCategories: (data: {
+    groupIds: number[]
+    knowledgeCategories?: string[]
+    autoReplyEnabled?: boolean
+    customerId?: number | null
+  }) => api.post<{ updated: number }>('/groups/batch-update-categories', data),
   messages: (id: number, params?: { page?: number; pageSize?: number }) => {
-    const query = new URLSearchParams(params as Record<string, string>).toString()
-    return api.get<unknown[]>(`/groups/${id}/messages${query ? `?${query}` : ''}`)
+    return api.get<unknown[]>(`/groups/${id}/messages${buildQuery(params)}`)
   },
   issues: (id: number, params?: { page?: number; pageSize?: number; status?: string }) => {
-    const query = new URLSearchParams(params as Record<string, string>).toString()
-    return api.get<unknown[]>(`/groups/${id}/issues${query ? `?${query}` : ''}`)
+    return api.get<unknown[]>(`/groups/${id}/issues${buildQuery(params)}`)
   },
 }
 
 // Members API
+export interface Member {
+  id: number
+  lineUserId: string
+  channel: Channel
+  displayName: string | null
+  pictureUrl: string | null
+  role: string
+  notes: string | null
+  groups: Array<{ group: { id: number; displayName: string | null; channel: Channel; customer?: { name: string } | null } }>
+  _count: { messages: number }
+  createdAt: string
+  updatedAt: string
+}
+
 export const membersApi = {
   list: (params?: { page?: number; pageSize?: number; role?: string; search?: string }) => {
-    const query = new URLSearchParams(params as Record<string, string>).toString()
-    return api.get<unknown[]>(`/members${query ? `?${query}` : ''}`)
+    return api.get<Member[]>(`/members${buildQuery(params)}`)
   },
-  get: (id: number) => api.get<unknown>(`/members/${id}`),
-  update: (id: number, data: unknown) => api.put<unknown>(`/members/${id}`, data),
+  get: (id: number) => api.get<Member>(`/members/${id}`),
+  update: (id: number, data: unknown) => api.put<Member>(`/members/${id}`, data),
+  delete: (id: number) => api.delete(`/members/${id}`),
+  batchDelete: (ids: number[]) => api.post<{ deleted: number }>('/members/batch-delete', { ids }),
+  fetchProfile: (id: number) => api.post<Member>(`/members/${id}/fetch-profile`),
+  batchFetchProfile: (ids: number[]) => api.post<{ total: number; success: number; failed: number }>('/members/batch-fetch-profile', { ids }),
   messages: (id: number, params?: { page?: number; pageSize?: number }) => {
-    const query = new URLSearchParams(params as Record<string, string>).toString()
-    return api.get<unknown[]>(`/members/${id}/messages${query ? `?${query}` : ''}`)
+    return api.get<unknown[]>(`/members/${id}/messages${buildQuery(params)}`)
   },
 }
 
@@ -134,8 +192,7 @@ export const messagesApi = {
     startDate?: string
     endDate?: string
   }) => {
-    const query = new URLSearchParams(params as Record<string, string>).toString()
-    return api.get<unknown[]>(`/messages${query ? `?${query}` : ''}`)
+    return api.get<unknown[]>(`/messages${buildQuery(params)}`)
   },
   get: (id: number) => api.get<unknown>(`/messages/${id}`),
 }
@@ -149,19 +206,21 @@ export const issuesApi = {
     customerId?: number
     groupId?: number
   }) => {
-    const query = new URLSearchParams(params as Record<string, string>).toString()
-    return api.get<unknown[]>(`/issues${query ? `?${query}` : ''}`)
+    return api.get<unknown[]>(`/issues${buildQuery(params)}`)
   },
   get: (id: number) => api.get<unknown>(`/issues/${id}`),
   update: (id: number, data: unknown) => api.put<unknown>(`/issues/${id}`, data),
+  delete: (id: number) => api.delete(`/issues/${id}`),
+  batchDelete: (ids: number[]) => api.post<{ deleted: number }>('/issues/batch-delete', { ids }),
+  batchUpdateStatus: (ids: number[], status: string) =>
+    api.post<{ updated: number }>('/issues/batch-update-status', { ids, status }),
   stats: () => api.get<unknown>('/issues/stats/summary'),
 }
 
 // Users API
 export const usersApi = {
   list: (params?: { page?: number; pageSize?: number }) => {
-    const query = new URLSearchParams(params as Record<string, string>).toString()
-    return api.get<unknown[]>(`/users${query ? `?${query}` : ''}`)
+    return api.get<unknown[]>(`/users${buildQuery(params)}`)
   },
   get: (id: number) => api.get<unknown>(`/users/${id}`),
   create: (data: unknown) => api.post<unknown>('/users', data),
@@ -180,9 +239,29 @@ export const rolesApi = {
 }
 
 // Settings API
+export interface OAuthStatus {
+  provider: string
+  valid: boolean
+  message: string
+  refreshCommand?: string
+}
+
+export interface OAuthStatusResponse {
+  currentProvider: string
+  providers: OAuthStatus[]
+}
+
+export interface ChannelStatus {
+  connected: boolean
+  message: string
+}
+
 export const settingsApi = {
   get: () => api.get<Record<string, string>>('/settings'),
   update: (data: Record<string, string>) => api.put('/settings', data),
+  getOAuthStatus: () => api.get<OAuthStatusResponse>('/settings/oauth/status'),
+  checkOAuthProvider: (provider: string) => api.get<OAuthStatus>(`/settings/oauth/status/${provider}`),
+  checkFeishuStatus: () => api.get<ChannelStatus>('/settings/channels/feishu/status'),
 }
 
 // Analysis API
@@ -202,7 +281,181 @@ export const logsApi = {
     startDate?: string
     endDate?: string
   }) => {
-    const query = new URLSearchParams(params as Record<string, string>).toString()
-    return api.get<unknown[]>(`/logs${query ? `?${query}` : ''}`)
+    return api.get<unknown[]>(`/logs${buildQuery(params)}`)
   },
+}
+
+// Knowledge API
+export type KnowledgeSource = 'MANUAL' | 'FILE_IMPORT' | 'FEISHU_SYNC'
+
+export interface KnowledgeEntry {
+  id: number
+  question: string
+  answer: string
+  category: string | null
+  keywords: string[]
+  source: KnowledgeSource
+  sourceRef: string | null
+  isActive: boolean
+  isSyncedToAI: boolean
+  usageCount: number
+  lastUsedAt: string | null
+  createdAt: string
+  updatedAt: string
+  createdBy: { id: number; displayName: string; username: string } | null
+}
+
+export interface KnowledgeStats {
+  total: number
+  active: number
+  synced: number
+  notSynced: number
+  totalUsage: number
+  embedding: {
+    total: number
+    embedded: number
+    notEmbedded: number
+    percentage: number
+  }
+  autoReply: {
+    total: number
+    matched: number
+    notMatched: number
+    today: number
+    matchRate: number
+  }
+}
+
+export interface AutoReplyLog {
+  id: number
+  messageId: number | null
+  groupId: number
+  memberId: number
+  question: string
+  answer: string | null
+  knowledgeId: number | null
+  matched: boolean
+  confidence: number | null
+  createdAt: string
+}
+
+export interface KnowledgeFile {
+  name: string
+  size: number
+  createdAt: string
+  modifiedAt: string
+}
+
+export interface FileUploadResult {
+  filename: string
+  originalName: string
+  contentLength: number
+  entriesFound: number
+  preview: string
+  entries: Array<{ question: string; answer: string; category?: string }>
+}
+
+export interface FileContent {
+  filename: string
+  content: string
+  entriesFound: number
+  entries: Array<{ question: string; answer: string; category?: string }>
+}
+
+export const knowledgeApi = {
+  list: (params?: {
+    page?: number
+    pageSize?: number
+    category?: string
+    isActive?: string
+    isSyncedToAI?: string
+    search?: string
+  }) => {
+    return api.get<KnowledgeEntry[]>(`/knowledge${buildQuery(params)}`)
+  },
+  get: (id: number) => api.get<KnowledgeEntry>(`/knowledge/${id}`),
+  create: (data: { question: string; answer: string; category?: string; keywords?: string[] }) =>
+    api.post<KnowledgeEntry>('/knowledge', data),
+  update: (id: number, data: { question?: string; answer?: string; category?: string | null; keywords?: string[]; isActive?: boolean }) =>
+    api.put<KnowledgeEntry>(`/knowledge/${id}`, data),
+  delete: (id: number) => api.delete(`/knowledge/${id}`),
+  batchDelete: (ids: number[]) => api.post<{ deleted: number }>('/knowledge/batch-delete', { ids }),
+  categories: () => api.get<{ name: string; count: number }[]>('/knowledge/categories'),
+  stats: () => api.get<KnowledgeStats>('/knowledge/stats'),
+  import: (entries: { question: string; answer: string; category?: string; keywords?: string[] }[]) =>
+    api.post<{ created: number; updated: number; errors: string[] }>('/knowledge/import', { entries }),
+  sync: (ids?: number[]) =>
+    api.post<{ synced: number; failed: number }>('/knowledge/sync', { ids }),
+  autoReplyLogs: (params?: { page?: number; pageSize?: number; matched?: string }) => {
+    return api.get<AutoReplyLog[]>(`/knowledge/auto-reply-logs${buildQuery(params)}`)
+  },
+
+  // 文件相關 API
+  getSupportedTypes: () => api.get<{ extensions: string[]; mimeTypes: string[] }>('/knowledge/files/supported-types'),
+
+  uploadFile: async (file: File): Promise<{ success: boolean; data?: FileUploadResult; error?: { code: string; message: string } }> => {
+    const token = useAuthStore.getState().token
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch(`${API_BASE}/knowledge/files/upload`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    })
+
+    return response.json()
+  },
+
+  listFiles: () => api.get<KnowledgeFile[]>('/knowledge/files'),
+
+  getFileContent: (filename: string) => api.get<FileContent>(`/knowledge/files/${encodeURIComponent(filename)}`),
+
+  deleteFile: (filename: string) => api.delete(`/knowledge/files/${encodeURIComponent(filename)}`),
+
+  clearAllFiles: () => api.delete<{ deleted: number; errors: string[] }>('/knowledge/files'),
+
+  importFromFile: (filename: string, category?: string) =>
+    api.post<{ created: number; updated: number; errors: string[]; total: number }>(
+      `/knowledge/files/${encodeURIComponent(filename)}/import`,
+      { category }
+    ),
+
+  batchImportFromFiles: (filenames?: string[], category?: string) =>
+    api.post<{
+      created: number
+      updated: number
+      total: number
+      filesProcessed: number
+      errors: string[]
+    }>('/knowledge/files/batch-import', { filenames, category }),
+
+  // 飛書知識庫同步
+  syncFromFeishu: () =>
+    api.post<{ created: number; updated: number; errors: string[] }>('/knowledge/sync-feishu'),
+}
+
+// Tunnel API
+export interface TunnelStatus {
+  isRunning: boolean
+  url: string | null
+  webhookUrl: string | null
+  startedAt: string | null
+  error: string | null
+}
+
+export interface TunnelHealth {
+  isValid: boolean
+  latency?: number
+  error?: string
+}
+
+export const tunnelApi = {
+  status: () => api.get<TunnelStatus>('/tunnel/status'),
+  start: () => api.post<{ success: boolean; url?: string; webhookUrl?: string; error?: string }>('/tunnel/start'),
+  stop: () => api.post<{ success: boolean }>('/tunnel/stop'),
+  restart: () => api.post<{ success: boolean; url?: string; webhookUrl?: string; error?: string }>('/tunnel/restart'),
+  health: () => api.get<TunnelHealth>('/tunnel/health'),
 }

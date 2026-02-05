@@ -25,17 +25,15 @@ export const customersRoutes: FastifyPluginAsync = async (app) => {
     '/',
     { preHandler: [authenticate, requirePermission('customer.view')] },
     async (request) => {
-      const { page = 1, pageSize = 20, search } = request.query as {
-        page?: number
-        pageSize?: number
-        search?: string
-      }
+      const query = request.query as { page?: string; pageSize?: string; search?: string }
+      const page = parseInt(query.page || '1', 10)
+      const pageSize = parseInt(query.pageSize || '20', 10)
 
-      const where = search
+      const where = query.search
         ? {
             OR: [
-              { name: { contains: search, mode: 'insensitive' as const } },
-              { contactPerson: { contains: search, mode: 'insensitive' as const } },
+              { name: { contains: query.search, mode: 'insensitive' as const } },
+              { contactPerson: { contains: query.search, mode: 'insensitive' as const } },
             ],
           }
         : {}

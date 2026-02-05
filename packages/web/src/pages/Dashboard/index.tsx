@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Card, Row, Col, Statistic, Button, message } from 'antd'
+import { Card, Row, Col, Statistic, Button, message, Divider } from 'antd'
 import {
   QuestionCircleOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   WarningOutlined,
   SyncOutlined,
+  UserOutlined,
+  TeamOutlined,
+  MessageOutlined,
+  UsergroupAddOutlined,
 } from '@ant-design/icons'
 import { issuesApi, analysisApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
@@ -15,6 +19,11 @@ interface Stats {
   replied: number
   timeout: number
   resolved: number
+  privateChats: number
+  groupChats: number
+  totalMessages: number
+  todayMessages: number
+  totalMembers: number
 }
 
 export function Dashboard() {
@@ -74,6 +83,8 @@ export function Dashboard() {
         )}
       </div>
 
+      {/* 問題統計 */}
+      <h3 style={{ marginBottom: 16 }}>問題追蹤</h3>
       <Row gutter={16}>
         <Col span={6}>
           <Card loading={loading}>
@@ -112,6 +123,53 @@ export function Dashboard() {
               value={stats?.resolved ?? 0}
               prefix={<WarningOutlined style={{ color: '#1890ff' }} />}
               valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 聊天統計 */}
+      <Divider />
+      <h3 style={{ marginBottom: 16 }}>聊天統計</h3>
+      <Row gutter={16}>
+        <Col span={6}>
+          <Card loading={loading}>
+            <Statistic
+              title="私聊對話"
+              value={stats?.privateChats ?? 0}
+              prefix={<UserOutlined style={{ color: '#1890ff' }} />}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card loading={loading}>
+            <Statistic
+              title="群組"
+              value={stats?.groupChats ?? 0}
+              prefix={<TeamOutlined style={{ color: '#52c41a' }} />}
+              valueStyle={{ color: '#52c41a' }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card loading={loading}>
+            <Statistic
+              title="今日訊息"
+              value={stats?.todayMessages ?? 0}
+              suffix={`/ ${stats?.totalMessages ?? 0}`}
+              prefix={<MessageOutlined style={{ color: '#722ed1' }} />}
+              valueStyle={{ color: '#722ed1' }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card loading={loading}>
+            <Statistic
+              title="總成員數"
+              value={stats?.totalMembers ?? 0}
+              prefix={<UsergroupAddOutlined style={{ color: '#13c2c2' }} />}
+              valueStyle={{ color: '#13c2c2' }}
             />
           </Card>
         </Col>

@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
+import multipart from '@fastify/multipart'
 import { config } from './config/index.js'
 import { logger } from './utils/logger.js'
 
@@ -17,6 +18,9 @@ import { rolesRoutes } from './routes/roles.js'
 import { settingsRoutes } from './routes/settings.js'
 import { analysisRoutes } from './routes/analysis.js'
 import { logsRoutes } from './routes/logs.js'
+import { knowledgeRoutes } from './routes/knowledge.js'
+import { tunnelRoutes } from './routes/tunnel.js'
+import { feishuWebhookRoutes } from './routes/feishu-webhook.js'
 
 export async function buildApp() {
   const app = Fastify({
@@ -33,6 +37,12 @@ export async function buildApp() {
     secret: config.jwtSecret,
   })
 
+  await app.register(multipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB
+    },
+  })
+
   // Health check
   app.get('/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() }
@@ -41,6 +51,7 @@ export async function buildApp() {
   // API Routes
   await app.register(authRoutes, { prefix: '/api/auth' })
   await app.register(webhookRoutes, { prefix: '/api/webhook' })
+  await app.register(feishuWebhookRoutes, { prefix: '/api/webhook' })
   await app.register(customersRoutes, { prefix: '/api/customers' })
   await app.register(groupsRoutes, { prefix: '/api/groups' })
   await app.register(membersRoutes, { prefix: '/api/members' })
@@ -51,6 +62,8 @@ export async function buildApp() {
   await app.register(settingsRoutes, { prefix: '/api/settings' })
   await app.register(analysisRoutes, { prefix: '/api/analysis' })
   await app.register(logsRoutes, { prefix: '/api/logs' })
+  await app.register(knowledgeRoutes, { prefix: '/api/knowledge' })
+  await app.register(tunnelRoutes, { prefix: '/api/tunnel' })
 
   return app
 }

@@ -28,6 +28,12 @@ const PERMISSIONS = {
   // 分析
   'analysis.run': '執行分析',
 
+  // 知識庫
+  'knowledge.view': '查看知識庫',
+  'knowledge.create': '新增知識庫',
+  'knowledge.edit': '編輯知識庫',
+  'knowledge.delete': '刪除知識庫',
+
   // 用戶
   'user.view': '查看用戶',
   'user.create': '新增用戶',
@@ -111,18 +117,25 @@ async function main() {
   console.log('Created user: admin')
 
   // 建立預設系統設定
+  // AI Provider 優先級: gemini-oauth > claude-code-oauth > claude > gemini > ollama
   const defaultSettings = [
-    { key: 'ai.provider', value: 'gemini', description: 'AI Provider' },
+    { key: 'ai.provider', value: 'gemini-oauth', description: 'AI Provider (gemini-oauth/claude-code-oauth/claude/gemini/ollama)' },
     { key: 'ai.claude.apiKey', value: '', description: 'Claude API Key' },
     { key: 'ai.claude.model', value: 'claude-sonnet-4-5-20250929', description: 'Claude Model' },
     { key: 'ai.gemini.apiKey', value: '', description: 'Gemini API Key' },
-    { key: 'ai.gemini.model', value: 'gemini-1.5-flash', description: 'Gemini Model' },
+    { key: 'ai.gemini.model', value: 'gemini-2.5-pro', description: 'Gemini Model' },
+    { key: 'ai.gemini.projectId', value: '', description: 'GCP Project ID (for Vertex AI)' },
+    { key: 'ai.gemini.location', value: 'us-central1', description: 'GCP Location (for Vertex AI)' },
     { key: 'ai.ollama.baseUrl', value: 'http://localhost:11434', description: 'Ollama Base URL' },
     { key: 'ai.ollama.model', value: 'llama3', description: 'Ollama Model' },
     { key: 'issue.timeoutMinutes', value: '15', description: '問題超時時間（分鐘）' },
     { key: 'issue.replyThreshold', value: '60', description: '回覆相關性閾值' },
     { key: 'line.channelSecret', value: '', description: 'LINE Channel Secret' },
     { key: 'line.channelAccessToken', value: '', description: 'LINE Channel Access Token' },
+    { key: 'bot.autoReply', value: 'false', description: '是否啟用自動回覆' },
+    { key: 'bot.notFoundReply', value: '抱歉，我目前無法回答這個問題。請稍候，會有專人為您服務。', description: '無法回答時的回覆內容' },
+    { key: 'bot.name', value: '', description: 'Bot 名稱（多個名稱用逗號分隔，提及名稱時會強制回覆）' },
+    { key: 'bot.confidenceThreshold', value: '50', description: '自動回覆信心度閾值（0-100）' },
   ]
 
   for (const setting of defaultSettings) {
