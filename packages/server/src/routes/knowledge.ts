@@ -122,6 +122,45 @@ export const knowledgeRoutes: FastifyPluginAsync = async (app) => {
     }
   )
 
+  // 匯出 CSV
+  app.get(
+    '/export',
+    { preHandler: [authenticate, requirePermission('knowledge.view')] },
+    async (request, reply) => {
+      const query = request.query as { category?: string }
+
+      const where: Record<string, unknown> = { isActive: true }
+      if (query.category) where.category = query.category
+
+      const entries = await prisma.knowledgeEntry.findMany({
+        where,
+        select: { question: true, answer: true, category: true },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      // CSV 特殊字符處理
+      const escapeCsv = (value: string | null): string => {
+        if (!value) return ''
+        if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
+          return '"' + value.replace(/"/g, '""') + '"'
+        }
+        return value
+      }
+
+      const header = 'question,answer,category'
+      const rows = entries.map(e =>
+        `${escapeCsv(e.question)},${escapeCsv(e.answer)},${escapeCsv(e.category)}`
+      )
+      const csv = '\uFEFF' + header + '\n' + rows.join('\n')
+
+      const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+
+      reply.header('Content-Type', 'text/csv; charset=utf-8')
+      reply.header('Content-Disposition', `attachment; filename=knowledge_export_${date}.csv`)
+      return reply.send(csv)
+    }
+  )
+
   // 測試知識庫搜尋
   app.post(
     '/search',

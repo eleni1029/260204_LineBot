@@ -42,6 +42,7 @@ import {
   EyeOutlined,
   FolderOpenOutlined,
   CloudDownloadOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { UploadProps } from 'antd'
@@ -1091,6 +1092,19 @@ export function KnowledgeList() {
                             )}
                           </Button>
                         </Tooltip>
+                        <Button
+                          icon={<DownloadOutlined />}
+                          onClick={async () => {
+                            try {
+                              await knowledgeApi.exportCsv()
+                              message.success('CSV 匯出成功')
+                            } catch {
+                              message.error('CSV 匯出失敗')
+                            }
+                          }}
+                        >
+                          匯出 CSV
+                        </Button>
                         <Button
                           icon={<UploadOutlined />}
                           onClick={() => setImportModalOpen(true)}

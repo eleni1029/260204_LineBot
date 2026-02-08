@@ -247,7 +247,7 @@ async function handleMessageEvent(event: MessageEvent) {
     }
 
     // 自動回覆功能
-    await handleAutoReply(event, savedMessage.id, group.id, member.id, content)
+    await handleAutoReply(event, savedMessage.id, group.id, member.id, content, isPrivateChat)
   }
 }
 
@@ -365,7 +365,8 @@ async function handleAutoReply(
   messageId: number,
   groupId: number,
   memberId: number,
-  question: string
+  question: string,
+  isPrivateChat: boolean
 ) {
   try {
     const settings = await getSettings()
@@ -391,14 +392,15 @@ async function handleAutoReply(
     // Step 2: 決定是否需要處理這條訊息
     // - 有關鍵字（Bot 名稱）：無論如何都要回應
     // - 沒有關鍵字：用 AI 判斷是否為問題，信心度達標才處理
-    let shouldProcess = botNameMentioned
+    // 私聊 = 視同提及 Bot 名稱（強制處理和回覆）
+    let shouldProcess = botNameMentioned || isPrivateChat
     let isQuestion = false
     let questionConfidence = 0
     let questionSummary = question
     let sentiment: 'positive' | 'neutral' | 'negative' = 'neutral'
 
-    if (!botNameMentioned) {
-      // 沒有提及 Bot 名稱，需要 AI 判斷是否為問題
+    if (!botNameMentioned && !isPrivateChat) {
+      // 沒有提及 Bot 名稱且非私聊，需要 AI 判斷是否為問題
       const analysis = await analyzeQuestionWithAI(question)
       isQuestion = analysis.isQuestion
       questionConfidence = analysis.confidence || 0
@@ -408,7 +410,7 @@ async function handleAutoReply(
       // 只有當 AI 認為是問題且信心度達標時才處理
       shouldProcess = isQuestion && questionConfidence >= confidenceThreshold
     } else {
-      // 提及 Bot 名稱，視為問題
+      // 提及 Bot 名稱或私聊，視為問題
       isQuestion = true
       questionConfidence = 100
     }
@@ -459,7 +461,7 @@ async function handleAutoReply(
     // Step 4: 決定是否回覆
     // - 有關鍵字：無論知識庫匹配如何都回覆（找不到就說找不到）
     // - 無關鍵字但判定為問題：只有知識庫匹配好才回覆
-    const shouldReply = botNameMentioned || hasGoodMatch
+    const shouldReply = botNameMentioned || isPrivateChat || hasGoodMatch
     let didReply = false
     let replyAnswer: string | null = null
 
@@ -493,8 +495,8 @@ async function handleAutoReply(
           })
 
           logger.info({ knowledgeId: result.entry.id, knowledgeConfidence }, 'Auto reply sent (good knowledge match)')
-        } else if (botNameMentioned && result) {
-          // 提及名稱 + 有部分匹配結果
+        } else if ((botNameMentioned || isPrivateChat) && result) {
+          // 提及名稱或私聊 + 有部分匹配結果
           replyAnswer = result.generatedAnswer || result.entry.answer
           await replyMessage(replyToken, replyAnswer)
           didReply = true
@@ -510,9 +512,9 @@ async function handleAutoReply(
             confidence: knowledgeConfidence,
           })
 
-          logger.info({ knowledgeConfidence, botNameMentioned: true }, 'Auto reply sent (bot name mentioned, partial match)')
-        } else if (botNameMentioned) {
-          // 提及名稱但完全沒有匹配，回覆找不到答案
+          logger.info({ knowledgeConfidence, botNameMentioned, isPrivateChat }, 'Auto reply sent (forced reply, partial match)')
+        } else if (botNameMentioned || isPrivateChat) {
+          // 提及名稱或私聊但完全沒有匹配，回覆找不到答案
           const notFoundReply = settings['bot.notFoundReply'] || '抱歉，我目前無法回答這個問題。請稍候，會有專人為您服務。'
           await replyMessage(replyToken, notFoundReply)
           replyAnswer = notFoundReply

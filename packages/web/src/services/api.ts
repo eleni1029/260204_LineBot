@@ -433,6 +433,28 @@ export const knowledgeApi = {
       errors: string[]
     }>('/knowledge/files/batch-import', { filenames, category }),
 
+  // 匯出 CSV
+  exportCsv: async (category?: string) => {
+    const token = useAuthStore.getState().token
+    const query = category ? `?category=${encodeURIComponent(category)}` : ''
+    const response = await fetch(`${API_BASE}/knowledge/export${query}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!response.ok) throw new Error('匯出失敗')
+    const blob = await response.blob()
+    const disposition = response.headers.get('Content-Disposition') || ''
+    const filenameMatch = disposition.match(/filename=(.+)/)
+    const filename = filenameMatch ? filenameMatch[1] : 'knowledge_export.csv'
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  },
+
   // 飛書知識庫同步
   syncFromFeishu: () =>
     api.post<{ created: number; updated: number; errors: string[] }>('/knowledge/sync-feishu'),
